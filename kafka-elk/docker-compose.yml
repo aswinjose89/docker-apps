@@ -1,0 +1,166 @@
+---
+# "`-._,-'"`-._,-'"`-._,-'"`-._,-'"`-._,-'"`-._,-'"`-._,-'"`-._,-'"`-._,-
+# Test Commands for the topicname 'nids':
+# ---------------------------------------
+# docker exec -it kafka-cntr bash /bin/kafka-topics --list --bootstrap-server localhost:9092
+# docker exec -it kafka-cntr bash /bin/kafka-console-consumer --topic codespotify-topic --from-beginning --bootstrap-server localhost:9092
+# docker exec -it kafka-cntr bash /bin/kafka-console-producer --topic codespotify-topic --bootstrap-server localhost:9092
+# Notes
+# -----
+# Data will communicate in the direction of kafka-->logstash-->Elasticsearch-->kibana
+# "`-._,-'"`-._,-'"`-._,-'"`-._,-'"`-._,-'"`-._,-'"`-._,-'"`-._,-'"`-._,-._,-'"`-._,-
+
+
+version: '3.3'
+services:
+  zookeeper:
+    container_name: zookeeper-cntr
+    image: confluentinc/cp-zookeeper:7.2.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - kafka_elk_nw
+
+  kafka:
+    container_name: kafka-cntr
+    image: confluentinc/cp-kafka:7.2.0
+    depends_on:
+      - zookeeper
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-cntr:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-cntr:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+    networks:
+      - kafka_elk_nw
+    healthcheck:
+      test: nc -vz kafka-cntr 9092 || exit -1
+      # start_period: 15s
+      interval: 5s
+      timeout: 10s
+      retries: 10
+  
+  # init-kafka:
+  #   image: confluentinc/cp-kafka:7.2.0
+  #   depends_on:
+  #     - kafka
+  #   entrypoint: [ '/bin/sh', '-c' ]
+  #   networks:
+  #     - nids
+  #   command: |
+  #     "
+  #     # blocks until kafka is reachable
+  #     kafka-topics --bootstrap-server nids-kafka-cntr:9092 --list
+
+  #     echo -e 'Creating kafka topics'
+  #     kafka-topics --bootstrap-server nids-kafka-cntr:9092 --create --if-not-exists --topic nids_prediction --replication-factor 1 --partitions 1
+      
+
+  #     echo -e 'Successfully created the following topics:'
+  #     kafka-topics --bootstrap-server nids-kafka-cntr:9092 --list
+  #     "
+  
+  elasticsearch:
+    container_name: elasticsearch-cntr
+    image: elasticsearch:7.9.1
+    environment:
+      - cluster.name=nids-cluster
+      - bootstrap.memory_lock=true
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data:rw
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - 9200:9200
+      - 9300:9300
+    depends_on:
+      - kafka
+    stdin_open: true
+    tty: true
+    restart: always
+    networks:
+      - kafka_elk_nw
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "50"
+    healthcheck:
+      test: curl -u elastic:elastic -s -f elasticsearch-cntr:9200/_cat/health >/dev/null || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 5
+  logstash:
+    container_name: logstash-cntr
+    image: logstash:7.9.1
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ./logstash-kafka.conf:/usr/share/logstash/pipeline/logstash-kafka.conf
+    ports:
+      - 5044:5044
+    depends_on:
+      - elasticsearch
+    stdin_open: true
+    tty: true
+    restart: always
+    networks:
+      - kafka_elk_nw
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "50"
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://logstash-cntr:9600"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+  kibana:
+    container_name: kibana-cntr
+    image: kibana:7.9.1
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - 5601:5601
+    depends_on:
+      - elasticsearch
+    stdin_open: true
+    tty: true
+    restart: always
+    networks:
+      - kafka_elk_nw
+    links: ['elasticsearch']
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "50"
+    healthcheck:
+      test: curl --fail http://kibana-cntr:5601 || exit 1
+      interval: 30s
+      retries: 3
+      timeout: 10s
+
+networks:
+  kafka_elk_nw:
+    driver: bridge
+
+volumes:
+  elasticsearch_data:
+    driver: local
