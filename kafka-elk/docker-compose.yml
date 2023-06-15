@@ -46,31 +46,11 @@ services:
       timeout: 10s
       retries: 10
   
-  # init-kafka:
-  #   image: confluentinc/cp-kafka:7.2.0
-  #   depends_on:
-  #     - kafka
-  #   entrypoint: [ '/bin/sh', '-c' ]
-  #   networks:
-  #     - nids
-  #   command: |
-  #     "
-  #     # blocks until kafka is reachable
-  #     kafka-topics --bootstrap-server nids-kafka-cntr:9092 --list
-
-  #     echo -e 'Creating kafka topics'
-  #     kafka-topics --bootstrap-server nids-kafka-cntr:9092 --create --if-not-exists --topic nids_prediction --replication-factor 1 --partitions 1
-      
-
-  #     echo -e 'Successfully created the following topics:'
-  #     kafka-topics --bootstrap-server nids-kafka-cntr:9092 --list
-  #     "
-  
   elasticsearch:
     container_name: elasticsearch-cntr
     image: elasticsearch:7.9.1
     environment:
-      - cluster.name=nids-cluster
+      - cluster.name=kafka-cluster
       - bootstrap.memory_lock=true
       - discovery.type=single-node
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
