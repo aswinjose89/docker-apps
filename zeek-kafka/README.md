@@ -1,8 +1,12 @@
 # Prerequisites
- Tested in Docker Version 20.x.x, Docker Compose version 1.29.x 
- Zeek version 6.2
 
-# ✨ Zeek With Kafka
+ | Package | Version |
+| ------ | ------ |
+| Docker | 20.x.x |
+| Docker Compose | 1.29.x |
+| Zeek | 6.2 |
+
+# ✨ Zeek With Kafka Setup
 Zeek, formerly known as Bro, is a powerful and flexible network analysis framework that is primarily used for security monitoring. It provides detailed visibility into network traffic and is widely used for network security monitoring, network performance monitoring, and network troubleshooting.
 
 Kafka is a stream processing platform which process messages in queue between producer and consumer via kafka broker
