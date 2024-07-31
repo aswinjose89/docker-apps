@@ -2,7 +2,7 @@
 version: '3.3'
 services:
   zeek-metron:
-    image: quantumventura/zeek-metron:6.2-lite
+    image: aswin1906/zeek-metron:6.2-lite
     hostname: zeek-metron
     container_name: zeek-metron
     restart: always
@@ -19,7 +19,7 @@ services:
       - NET_RAW # allow Zeek to listen to raw packets
       - net_admin # allow Zeek to modify interface settings
     network_mode: "host" # allow Zeek to monitor host network interfaces
-    command: -i af_packet::eth0 local # Refer https://github.com/zeek/zeek-af_packet-plugin
+    command: -i af_packet::eth0 local /usr/local/nids_zeek_server/index.js # Refer https://github.com/zeek/zeek-af_packet-plugin
     # command: -i af_packet::wlp59s0 local "Site::local_nets += { 192.168.0.100/24 }"
     logging:
       driver: "json-file"
